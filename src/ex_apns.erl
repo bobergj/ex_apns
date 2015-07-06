@@ -153,7 +153,8 @@ connect(Address, Port, CertFile) ->
   SslOptions = [binary,
                 {active, false},
                 {certfile, CertFile},
-                {cacertfile, CaCertFile}],
+                {cacertfile, CaCertFile},
+                {versions,['tlsv1.1']}],
   ssl:connect(Address, Port, SslOptions).
 
 %% @spec connect(State::#state{}) -> {ok, #state{}} | {stop, reason()}
