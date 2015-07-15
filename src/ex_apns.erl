@@ -29,9 +29,7 @@
          start_link/3,
          send/3,
          send/4,
-         feedback/1,
-         token_to_integer/1,
-         token_to_binary/1]).
+         feedback/1]).
 
 -export([init/1,
          handle_call/3,
@@ -81,25 +79,6 @@ feedback(ServerRef) ->
     {ok, Socket} -> feedback_loop(Socket);
     Error -> Error end.
 
-%% @spec token_to_integer(Token::token()) -> integer()
-%% @doc Convert a token to its integer representation.
-token_to_integer(Bin) when is_binary(Bin), byte_size(Bin) =:= 64 ->
-  token_to_integer(Bin, 0);
-token_to_integer(I) when is_integer(I), I >= 0, I < 1 bsl 256 ->
-  I;
-token_to_integer(List) when is_list(List) ->
-  token_to_integer(iolist_to_binary(List)).
-
-%% @spec token_to_binary(Token::token()) -> binary()
-%% @doc Convert a token to its binary representation.
-token_to_binary(I) when is_integer(I), I >= 0, I < 1 bsl 256 ->
-  iolist_to_binary(erlang:integer_to_list(I, 16));
-token_to_binary(Bin) when is_binary(Bin), byte_size(Bin) =:= 64 ->
-  Bin;
-token_to_binary(List) when is_list(List) ->
-  token_to_binary(iolist_to_binary(List)).
-
-
 %% @hidden
 init({Env, CertFile}) ->
   case connect(env_to_gateway(Env), 2195, CertFile) of
@@ -118,15 +97,13 @@ handle_call(_Request, _From, State) ->
 
 %% @hidden
 handle_cast({send, Token, Payload}, State) ->
-  TokenInt = token_to_integer(Token),
   PayloadBin = jsx:encode(Payload),
-  Packet = [<<0, 32:16, TokenInt:256,
+  Packet = [<<0, 32:16, Token/binary,
             (iolist_size(PayloadBin)):16>> | PayloadBin],
   send(Packet, State);
 handle_cast({send, Token, Payload, Expiry}, State = #state{next = Id}) ->
-  TokenInt = token_to_integer(Token),
   PayloadBin = jsx:term_to_json(Payload),
-  Packet = [<<1, Id:32, Expiry:32, 32:16, TokenInt:256,
+  Packet = [<<1, Id:32, Expiry:32, 32:16, Token/binary,
               (iolist_size(PayloadBin)):16>> | PayloadBin],
   send(Packet, State#state{next = Id + 1});
 handle_cast(_Msg, State) ->
@@ -219,17 +196,6 @@ env_to_feedback(production) ->
   'feedback.push.apple.com';
 env_to_feedback(development) ->
   'feedback.sandbox.push.apple.com'.
-
-%% @hidden
-token_to_integer(<<C, Rest/binary>>, I) when C >= $0, C =< $9 ->
-  token_to_integer(Rest, I * 16 + C - $0);
-token_to_integer(<<C, Rest/binary>>, I) when C >= $a, C =< $f ->
-  token_to_integer(Rest, I * 16 + C - $a + 10);
-token_to_integer(<<C, Rest/binary>>, I) when C >= $A, C =< $F ->
-  token_to_integer(Rest, I * 16 + C - $A + 10);
-token_to_integer(<<>>, I) ->
-  I.
-
 
 %% @spec status_to_reason(Integer::integer()) -> atom()
 status_to_reason(1) ->
