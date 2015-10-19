@@ -20,7 +20,8 @@
   {applications, [
                   kernel,
                   stdlib,
-                  ssl
+                  ssl,
+                  jsx
                  ]},
   {mod, {ex_apns_app, []}},
   {env, []}
